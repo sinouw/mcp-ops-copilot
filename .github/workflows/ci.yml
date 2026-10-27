@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ops
+          POSTGRES_PASSWORD: ops
+          POSTGRES_DB: ops
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ops" --health-interval 2s --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgresql://ops:ops@localhost:5432/ops
+      DATABASE_URL: postgresql://ops:ops@localhost:5432/ops
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.13.4"
+      - run: uv sync --frozen
+      - name: Lint
+        run: |
+          uv run ruff check src tests
+          uv run ruff format --check src tests
+      - name: Type check
+        run: uv run mypy
+      - name: Tests
+        run: uv run pytest -q
+      - name: Evals (offline scripted + hijacked models)
+        run: |
+          uv run opscopilot eval --out evals/ci-results
+          uv run opscopilot eval --provider scripted-hijacked --out evals/ci-results
+          uv run python evals/assert_thresholds.py evals/ci-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: evals/ci-results
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

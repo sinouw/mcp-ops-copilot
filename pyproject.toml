@@ -1,0 +1,73 @@
+[project]
+name = "opscopilot"
+version = "0.1.0"
+description = "Multi-agent support-ops copilot on MCP with human-in-the-loop approvals, guardrails, tracing and evals."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Yassine El Ouni" }]
+dependencies = [
+  "mcp>=1.9",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "asyncpg>=0.29",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "httpx>=0.27",
+  "pyyaml>=6.0",
+  "opentelemetry-api>=1.25",
+  "opentelemetry-sdk>=1.25",
+  "opentelemetry-exporter-otlp-proto-http>=1.25",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.6",
+  "mypy>=1.10",
+  "types-PyYAML",
+  "pgserver>=0.1.4",
+  "asgi-lifespan>=2.1",
+]
+
+[project.scripts]
+opscopilot = "opscopilot.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/opscopilot"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF"]
+ignore = ["RUF001"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["opscopilot"]
+mypy_path = "src"
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["asyncpg.*", "pgserver.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+markers = ["integration: needs Postgres (embedded via pgserver or DATABASE_URL)"]
+
+[tool.uv]
+# Newer cryptography releases ship no macOS x86_64 wheels; keep Intel Macs building without Rust/OpenSSL.
+constraint-dependencies = ["cryptography<48"]

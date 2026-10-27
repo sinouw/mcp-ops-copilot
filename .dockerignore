@@ -1,0 +1,8 @@
+.venv
+.pgdata
+.git
+web/node_modules
+web/dist
+evals/results
+**/__pycache__
+.env
